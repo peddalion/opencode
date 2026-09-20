@@ -1,6 +1,6 @@
 import { app, dialog } from "electron"
 import pkg from "electron-updater"
-import { UPDATER_ENABLED } from "./constants"
+import { updaterEnabled } from "./constants"
 import { createUpdaterController, type UpdaterReadyRecord } from "./updater-controller"
 import { getLogger } from "./logging"
 import { getStore } from "./store"
@@ -27,7 +27,7 @@ export function setupAutoUpdater(stop: () => Promise<void>) {
 
   const store = getStore("opencode.updater")
   return createUpdaterController({
-    enabled: UPDATER_ENABLED,
+    enabled: updaterEnabled(),
     currentVersion: app.getVersion(),
     backend: {
       checkForUpdates: () => autoUpdater.checkForUpdates(),

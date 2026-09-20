@@ -34,6 +34,7 @@ const channel = (() => {
   if (raw === "dev" || raw === "beta" || raw === "prod") return raw
   return "dev"
 })()
+const portable = process.env.OPENCODE_PORTABLE_BUILD === "1"
 
 const APP_IDS = {
   dev: "ai.opencode.desktop.dev",
@@ -42,7 +43,7 @@ const APP_IDS = {
 } as const
 
 const getBase = (appId: string): Configuration => ({
-  artifactName: "opencode-desktop-${os}-${arch}.${ext}",
+  artifactName: portable ? "opencode-desktop-${os}-${arch}-portable.${ext}" : "opencode-desktop-${os}-${arch}.${ext}",
   directories: {
     output: "dist",
     buildResources: "resources",
@@ -72,6 +73,7 @@ const getBase = (appId: string): Configuration => ({
       filter: ["index.js", "index.d.ts", "build/Release/mac_window.node", "swift-build/**"],
     },
   ],
+  ...(portable ? { extraFiles: [{ from: "resources/portable.flag", to: "portable.flag" }] } : {}),
   mac: {
     category: "public.app-category.developer-tools",
     icon: `resources/icons/icon.icns`,
@@ -94,7 +96,7 @@ const getBase = (appId: string): Configuration => ({
     signtoolOptions: {
       sign: signWindows,
     },
-    target: ["nsis"],
+    target: portable ? ["zip"] : ["nsis"],
     verifyUpdateCodeSignature: false,
   },
   nsis: {

@@ -6,6 +6,7 @@ import { getLogger } from "./logging"
 import { getUserShell, loadShellEnv } from "./shell-env"
 import { getStore } from "./store"
 import { DEFAULT_SERVER_URL_KEY } from "./store-keys"
+import { withPortableHome } from "./portable"
 
 export type HealthCheck = { wait: Promise<void> }
 
@@ -212,7 +213,9 @@ export async function checkHealth(url: string, password?: string | null): Promis
 
 function createSidecarEnv(): Record<string, string> {
   const env = Object.fromEntries(
-    Object.entries(process.env).flatMap(([key, value]) => (value === undefined ? [] : [[key, String(value)]])),
+    Object.entries(withPortableHome(process.env)).flatMap(([key, value]) =>
+      value === undefined ? [] : [[key, String(value)]],
+    ),
   )
   delete env.DEBUG
   if (process.platform === "linux") delete env.LD_PRELOAD
