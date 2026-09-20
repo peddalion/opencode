@@ -73,7 +73,16 @@ const getBase = (appId: string): Configuration => ({
       filter: ["index.js", "index.d.ts", "build/Release/mac_window.node", "swift-build/**"],
     },
   ],
-  ...(portable ? { extraFiles: [{ from: "resources/portable.flag", to: "portable.flag" }] } : {}),
+  ...(portable
+    ? {
+        extraFiles: [
+          { from: "resources/portable.flag", to: "portable.flag" },
+          { from: "resources/portable-build.json", to: "portable-build.json" },
+          { from: "resources/Update-OpenCodePortable.ps1", to: "Update-OpenCodePortable.ps1" },
+          { from: "resources/Update-OpenCodePortable.cmd", to: "Update-OpenCodePortable.cmd" },
+        ],
+      }
+    : {}),
   mac: {
     category: "public.app-category.developer-tools",
     icon: `resources/icons/icon.icns`,

@@ -3,6 +3,7 @@ name: Portable Windows
 on:
   push:
     branches:
+      - dev
       - windows-portable
   workflow_dispatch:
 
@@ -10,7 +11,7 @@ jobs:
   build:
     runs-on: windows-latest
     permissions:
-      contents: read
+      contents: write
     steps:
       - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v4
       - uses: ./.github/actions/setup-bun
@@ -48,4 +49,22 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: opencode-desktop-windows-x64-portable
-          path: packages/desktop/dist/*-portable.zip
+          path: |
+            packages/desktop/dist/*-portable.zip
+            packages/desktop/dist/portable-build.json
+      - name: Publish portable-latest release
+        if: github.repository == 'peddalion/opencode' && github.ref_name == 'dev'
+        shell: pwsh
+        working-directory: packages/desktop
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $zip = Get-ChildItem -LiteralPath dist -Filter '*-portable.zip' | Select-Object -First 1
+          if (-not $zip) { throw 'Portable zip not found' }
+          gh release view portable-latest --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create portable-latest --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --prerelease --title 'OpenCode Portable Latest' --notes "Automated portable build from $env:GITHUB_SHA"
+          } else {
+            gh release edit portable-latest --repo $env:GITHUB_REPOSITORY --prerelease --title 'OpenCode Portable Latest' --notes "Automated portable build from $env:GITHUB_SHA"
+          }
+          gh release upload portable-latest $zip.FullName dist/portable-build.json --repo $env:GITHUB_REPOSITORY --clobber

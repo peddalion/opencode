@@ -34,3 +34,7 @@ folder to another Windows drive automatically updates persisted project and
 session drive roots on the next launch. Portable builds disable the installer
 auto-updater and are updated by replacing the application files while retaining
 the `home` directory.
+
+Run `Update-OpenCodePortable.cmd` after closing OpenCode to install the latest
+successful build published by the fork. The updater verifies GitHub's SHA-256
+digest and keeps a rollback copy of every replaced application file.

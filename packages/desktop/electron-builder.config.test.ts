@@ -87,7 +87,14 @@ test("packages a marker-based portable Windows zip", async () => {
 
   expect(config.artifactName).toBe("opencode-desktop-${os}-${arch}-portable.${ext}")
   expect(config.win?.target).toEqual(["zip"])
-  expect(config.extraFiles).toContainEqual({ from: "resources/portable.flag", to: "portable.flag" })
+  expect(config.extraFiles).toEqual(
+    expect.arrayContaining([
+      { from: "resources/portable.flag", to: "portable.flag" },
+      { from: "resources/portable-build.json", to: "portable-build.json" },
+      { from: "resources/Update-OpenCodePortable.ps1", to: "Update-OpenCodePortable.ps1" },
+      { from: "resources/Update-OpenCodePortable.cmd", to: "Update-OpenCodePortable.cmd" },
+    ]),
+  )
 })
 
 for (const channel of ["beta", "prod"] as const) {
