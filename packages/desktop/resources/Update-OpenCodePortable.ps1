@@ -30,6 +30,57 @@ function Test-Digest([string]$Path, [string]$Digest) {
     return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash -eq $Matches[1]
 }
 
+function Save-Download([string]$Uri, [string]$Path, [long]$ExpectedLength) {
+    Add-Type -AssemblyName System.Net.Http
+    $Handler = [System.Net.Http.HttpClientHandler]::new()
+    $Handler.AllowAutoRedirect = $true
+    $Client = [System.Net.Http.HttpClient]::new($Handler)
+    $Client.DefaultRequestHeaders.UserAgent.ParseAdd('OpenCode-Portable-Updater')
+    $Response = $null
+    $InputStream = $null
+    $OutputStream = $null
+    try {
+        $Response = $Client.GetAsync($Uri, [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead).GetAwaiter().GetResult()
+        $null = $Response.EnsureSuccessStatusCode()
+        $Total = if ($Response.Content.Headers.ContentLength.HasValue) {
+            $Response.Content.Headers.ContentLength.Value
+        } else {
+            $ExpectedLength
+        }
+        $InputStream = $Response.Content.ReadAsStreamAsync().GetAwaiter().GetResult()
+        $OutputStream = [System.IO.File]::Open($Path, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+        $Buffer = New-Object byte[] (1024 * 1024)
+        $Written = [long]0
+        $LastPercent = -1
+        $Timer = [System.Diagnostics.Stopwatch]::StartNew()
+
+        while (($Read = $InputStream.Read($Buffer, 0, $Buffer.Length)) -gt 0) {
+            $OutputStream.Write($Buffer, 0, $Read)
+            $Written += $Read
+            if ($Total -le 0) {
+                Write-Host -NoNewline ("`rDownload: {0:N1} MB" -f ($Written / 1MB))
+                continue
+            }
+
+            $Percent = [Math]::Min(100, [int][Math]::Floor(($Written * 100) / $Total))
+            if ($Percent -eq $LastPercent) { continue }
+            $LastPercent = $Percent
+            $Filled = [int][Math]::Floor($Percent * 30 / 100)
+            $Bar = ('#' * $Filled).PadRight(30, '.')
+            $Rate = if ($Timer.Elapsed.TotalSeconds -gt 0) { ($Written / 1MB) / $Timer.Elapsed.TotalSeconds } else { 0 }
+            $Status = "`rDownload: {0,3}% [{1}] {2,7:N1}/{3:N1} MB  {4:N1} MB/s" -f $Percent, $Bar, ($Written / 1MB), ($Total / 1MB), $Rate
+            Write-Host -NoNewline $Status.PadRight(100)
+        }
+        Write-Host ''
+    } finally {
+        if ($OutputStream) { $OutputStream.Dispose() }
+        if ($InputStream) { $InputStream.Dispose() }
+        if ($Response) { $Response.Dispose() }
+        $Client.Dispose()
+        $Handler.Dispose()
+    }
+}
+
 function Get-PortableRelease {
     $Headers = @{
         'User-Agent' = 'OpenCode-Portable-Updater'
@@ -85,9 +136,7 @@ if ($Package) {
         $Partial = "$Download.partial"
         Remove-Item -LiteralPath $Partial -Force -ErrorAction SilentlyContinue
         Remove-Item -LiteralPath $Download -Force -ErrorAction SilentlyContinue
-        Invoke-WebRequest -Uri $Info.Package.browser_download_url -OutFile $Partial -Headers @{
-            'User-Agent' = 'OpenCode-Portable-Updater'
-        }
+        Save-Download $Info.Package.browser_download_url $Partial ([long]$Info.Package.size)
         Move-Item -LiteralPath $Partial -Destination $Download -Force
         if (Test-Digest $Download $ExpectedDigest) {
             $Verified = $true
