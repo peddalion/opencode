@@ -17,6 +17,18 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "24"
+      - name: Test core drive migration
+        working-directory: packages/core
+        run: bun test test/database-drive-migration.test.ts
+      - name: Test desktop portable mode
+        working-directory: packages/desktop
+        run: bun test src/main/portable.test.ts electron-builder.config.test.ts
+      - name: Typecheck core
+        working-directory: packages/core
+        run: bun typecheck
+      - name: Typecheck desktop
+        working-directory: packages/desktop
+        run: bun typecheck
       - name: Prepare
         working-directory: packages/desktop
         run: bun ./scripts/prepare.ts
