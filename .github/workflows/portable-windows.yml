@@ -7,6 +7,10 @@ on:
       - windows-portable
   workflow_dispatch:
 
+concurrency:
+  group: portable-windows-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: windows-latest
@@ -61,10 +65,9 @@ jobs:
         run: |
           $zip = Get-ChildItem -LiteralPath dist -Filter '*-portable.zip' | Select-Object -First 1
           if (-not $zip) { throw 'Portable zip not found' }
-          gh release view portable-latest --repo $env:GITHUB_REPOSITORY *> $null
-          if ($LASTEXITCODE -ne 0) {
-            gh release create portable-latest --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --prerelease --title 'OpenCode Portable Latest' --notes "Automated portable build from $env:GITHUB_SHA"
-          } else {
-            gh release edit portable-latest --repo $env:GITHUB_REPOSITORY --prerelease --title 'OpenCode Portable Latest' --notes "Automated portable build from $env:GITHUB_SHA"
-          }
-          gh release upload portable-latest $zip.FullName dist/portable-build.json --repo $env:GITHUB_REPOSITORY --clobber
+          $tag = "portable-$($env:GITHUB_SHA.Substring(0, 12))"
+          gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -eq 0) { exit 0 }
+          gh release create $tag --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --draft --title "OpenCode Portable $($env:GITHUB_SHA.Substring(0, 12))" --notes "Automated portable build from $env:GITHUB_SHA"
+          gh release upload $tag $zip.FullName dist/portable-build.json --repo $env:GITHUB_REPOSITORY
+          gh release edit $tag --repo $env:GITHUB_REPOSITORY --draft=false --latest

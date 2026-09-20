@@ -30,6 +30,24 @@ function Test-Digest([string]$Path, [string]$Digest) {
     return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash -eq $Matches[1]
 }
 
+function Get-PortableRelease {
+    $Headers = @{
+        'User-Agent' = 'OpenCode-Portable-Updater'
+        'Accept' = 'application/vnd.github+json'
+        'X-GitHub-Api-Version' = '2022-11-28'
+    }
+    $Release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repository/releases/latest" -Headers $Headers
+    $PackageAsset = $Release.assets | Where-Object { $_.name -eq 'opencode-desktop-win-x64-portable.zip' } | Select-Object -First 1
+    $MetadataAsset = $Release.assets | Where-Object { $_.name -eq 'portable-build.json' } | Select-Object -First 1
+    if (-not $PackageAsset -or -not $MetadataAsset) {
+        throw 'Der GitHub-Release enthaelt keinen vollstaendigen Portable-Build.'
+    }
+    return [pscustomobject]@{
+        Package = $PackageAsset
+        Metadata = Invoke-RestMethod -Uri $MetadataAsset.browser_download_url -Headers $Headers
+    }
+}
+
 Write-Host ''
 Write-Host 'OpenCode Portable Updater' -ForegroundColor Cyan
 Write-Host '=========================' -ForegroundColor Cyan
@@ -42,20 +60,9 @@ if ($Package) {
     $Download = (Resolve-Path -LiteralPath $Package).Path
 } else {
     Write-Host 'Pruefe GitHub auf einen neuen Portable-Build ...'
-    $Release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repository/releases/tags/portable-latest" -Headers @{
-        'User-Agent' = 'OpenCode-Portable-Updater'
-        'Accept' = 'application/vnd.github+json'
-    }
-    $PackageAsset = $Release.assets | Where-Object { $_.name -eq 'opencode-desktop-win-x64-portable.zip' } | Select-Object -First 1
-    $MetadataAsset = $Release.assets | Where-Object { $_.name -eq 'portable-build.json' } | Select-Object -First 1
-    if (-not $PackageAsset -or -not $MetadataAsset) {
-        throw 'Der GitHub-Release enthaelt keinen vollstaendigen Portable-Build.'
-    }
-
-    $ExpectedMetadata = Invoke-RestMethod -Uri $MetadataAsset.browser_download_url -Headers @{
-        'User-Agent' = 'OpenCode-Portable-Updater'
-    }
-    $ExpectedDigest = [string]$PackageAsset.digest
+    $Info = Get-PortableRelease
+    $ExpectedMetadata = $Info.Metadata
+    $ExpectedDigest = [string]$Info.Package.digest
     if ($Current -and $Current.commit -eq $ExpectedMetadata.commit) {
         Write-Host "OpenCode Portable ist aktuell: $($Current.version)" -ForegroundColor Green
         exit 0
@@ -66,14 +73,30 @@ if ($Package) {
     }
 
     New-Item -ItemType Directory -Force -Path $Work | Out-Null
-    $Partial = "$Download.partial"
-    Remove-Item -LiteralPath $Partial -Force -ErrorAction SilentlyContinue
-    Invoke-WebRequest -Uri $PackageAsset.browser_download_url -OutFile $Partial -Headers @{
-        'User-Agent' = 'OpenCode-Portable-Updater'
+    $Verified = $false
+    foreach ($Attempt in 1..3) {
+        if ($Attempt -gt 1) {
+            Write-Host "Download wird erneut versucht ($Attempt/3) ..." -ForegroundColor Yellow
+            Start-Sleep -Seconds 5
+            $Info = Get-PortableRelease
+            $ExpectedMetadata = $Info.Metadata
+            $ExpectedDigest = [string]$Info.Package.digest
+        }
+        $Partial = "$Download.partial"
+        Remove-Item -LiteralPath $Partial -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $Download -Force -ErrorAction SilentlyContinue
+        Invoke-WebRequest -Uri $Info.Package.browser_download_url -OutFile $Partial -Headers @{
+            'User-Agent' = 'OpenCode-Portable-Updater'
+        }
+        Move-Item -LiteralPath $Partial -Destination $Download -Force
+        if (Test-Digest $Download $ExpectedDigest) {
+            $Verified = $true
+            break
+        }
     }
-    Move-Item -LiteralPath $Partial -Destination $Download -Force
-    if (-not (Test-Digest $Download $ExpectedDigest)) {
-        throw 'SHA-256-Pruefung des Downloads fehlgeschlagen.'
+    if (-not $Verified) {
+        Remove-Item -LiteralPath $Download -Force -ErrorAction SilentlyContinue
+        throw 'SHA-256-Pruefung des Downloads ist nach drei Versuchen fehlgeschlagen.'
     }
 }
 
