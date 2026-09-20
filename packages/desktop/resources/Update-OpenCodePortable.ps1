@@ -8,7 +8,11 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'Continue'
-$Root = if ($PortableRoot) { (Resolve-Path -LiteralPath $PortableRoot).Path.TrimEnd('\') } else { $PSScriptRoot.TrimEnd('\') }
+$Root = if ($PortableRoot) {
+    (Resolve-Path -LiteralPath $PortableRoot.Trim().Trim('"')).Path.TrimEnd('\')
+} else {
+    $PSScriptRoot.TrimEnd('\')
+}
 $Work = Join-Path $Root 'update'
 $Staging = Join-Path $Work 'staging'
 $Backup = Join-Path $Work 'backup'
