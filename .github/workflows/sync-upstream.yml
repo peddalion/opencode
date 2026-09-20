@@ -16,11 +16,18 @@ jobs:
         with:
           ref: dev
           fetch-depth: 0
-      - name: Merge upstream dev
+      - name: Merge latest upstream release
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           git remote add upstream https://github.com/anomalyco/opencode.git
-          git fetch upstream dev
+          release=$(gh api repos/anomalyco/opencode/releases/latest --jq .tag_name)
+          git fetch upstream "refs/tags/$release:refs/tags/$release"
+          if git merge-base --is-ancestor "$release" HEAD; then
+            echo "Already contains $release"
+            exit 0
+          fi
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git merge --no-edit upstream/dev
+          git merge --no-edit "$release"
           git push origin HEAD:dev
