@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { relocateDesktopState, resolvePortableHome, withPortableHome } from "./portable"
+import { portableSecrets, relocateDesktopState, resolvePortableHome, withPortableHome } from "./portable"
 
 const roots: string[] = []
 
@@ -32,6 +32,18 @@ describe("portable desktop", () => {
       USERPROFILE: "D:\\OpenCode\\home",
     })
     expect(source).toEqual({ PATH: "bin", OPENCODE_PORTABLE_HOME: "D:\\OpenCode\\home" })
+  })
+
+  test("loads portable secrets without overriding inherited values", () => {
+    const root = mkdtempSync(join(tmpdir(), "opencode-portable-secrets-"))
+    roots.push(root)
+    mkdirSync(join(root, "secrets"), { recursive: true })
+    writeFileSync(join(root, "secrets", "RUNPOD_LLM_KEY.txt"), "runpod-secret\n")
+    writeFileSync(join(root, "secrets", "MEISTERPLAN_API_TOKEN.txt"), "file-token\n")
+
+    expect(portableSecrets(root, { MEISTERPLAN_API_TOKEN: "inherited-token" })).toEqual({
+      RUNPOD_LLM_KEY: "runpod-secret",
+    })
   })
 
   test("relocates recent projects and backs up stale scoped stores", () => {

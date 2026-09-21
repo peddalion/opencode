@@ -23,6 +23,7 @@ export function setupPortable(appId: string): PortableState | undefined {
   const previousDrive = previous ? parse(previous).root.slice(0, 2).toUpperCase() : undefined
   const currentDrive = parse(root).root.slice(0, 2).toUpperCase()
   const relocated = process.platform === "win32" && Boolean(previousDrive) && previousDrive !== currentDrive
+  const secrets = portableSecrets(root, process.env)
 
   ;[
     data,
@@ -35,6 +36,7 @@ export function setupPortable(appId: string): PortableState | undefined {
 
   Object.assign(process.env, {
     OPENCODE_PORTABLE_HOME: home,
+    PORTABLE_ROOT: root,
     OPENCODE_DISABLE_AUTOUPDATE: "1",
     XDG_DATA_HOME: data,
     XDG_CONFIG_HOME: join(home, ".config"),
@@ -43,6 +45,7 @@ export function setupPortable(appId: string): PortableState | undefined {
     OPENCODE_CONFIG_DIR: join(home, ".config", "opencode"),
     TEMP: join(root, "temp"),
     TMP: join(root, "temp"),
+    ...secrets,
     ...(relocated
       ? {
           OPENCODE_PORTABLE_MIGRATE_FROM: previousDrive,
@@ -62,6 +65,18 @@ export function setupPortable(appId: string): PortableState | undefined {
       writeFileSync(marker, root, "utf8")
     },
   }
+}
+
+export function portableSecrets(root: string, env: NodeJS.ProcessEnv) {
+  return Object.fromEntries(
+    ["RUNPOD_LLM_KEY", "MEISTERPLAN_API_TOKEN"].flatMap<[string, string]>((name) => {
+      if (env[name]) return []
+      const path = join(root, "secrets", `${name}.txt`)
+      if (!existsSync(path)) return []
+      const value = readFileSync(path, "utf8").trim()
+      return value ? [[name, value]] : []
+    }),
+  )
 }
 
 export function resolvePortableHome(
