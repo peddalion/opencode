@@ -44,9 +44,13 @@ describe("portable desktop", () => {
       join(userData, "opencode.global.dat"),
       JSON.stringify({
         server: JSON.stringify({
-          projects: { local: [{ worktree: "F:/projects/demo", expanded: true }] },
+          projects: {
+            local: [{ worktree: "F:\\projects\\demo", expanded: true }],
+            remote: [{ worktree: "F:\\remote\\demo", expanded: true }],
+          },
           lastProject: { local: "F:/projects/demo" },
         }),
+        notification: JSON.stringify([{ directory: "F:\\projects\\demo" }]),
         layout: JSON.stringify({ home: { selection: { directory: "F:/projects/demo" } } }),
       }),
     )
@@ -58,9 +62,13 @@ describe("portable desktop", () => {
 
     const global = JSON.parse(readFileSync(join(userData, "opencode.global.dat"), "utf8")) as Record<string, string>
     expect(JSON.parse(global.server)).toEqual({
-      projects: { local: [{ worktree: "D:/projects/demo", expanded: true }] },
+      projects: {
+        local: [{ worktree: "D:\\projects\\demo", expanded: true }],
+        remote: [{ worktree: "F:\\remote\\demo", expanded: true }],
+      },
       lastProject: { local: "D:/projects/demo" },
     })
+    expect(JSON.parse(global.notification)).toEqual([{ directory: "D:\\projects\\demo" }])
     expect(global.layout).toBeUndefined()
     expect(readdirSync(userData)).not.toContain("opencode.workspace.old.dat")
     expect(readdirSync(userData)).not.toContain("opencode.window.old.dat")

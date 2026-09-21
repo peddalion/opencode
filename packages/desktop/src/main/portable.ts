@@ -104,10 +104,16 @@ export function relocateDesktopState(userData: string, backupRoot: string, from:
     copyFileSync(global, join(backup, "opencode.global.dat"))
     const data = JSON.parse(readFileSync(global, "utf8")) as Record<string, unknown>
     if (typeof data.server === "string") {
-      data.server = JSON.stringify(relocateServerState(JSON.parse(data.server), `${from}/`, `${to}/`))
+      data.server = JSON.stringify(relocateServerState(JSON.parse(data.server), from, to))
     }
     if (data.server && typeof data.server === "object") {
-      data.server = relocateServerState(data.server, `${from}/`, `${to}/`)
+      data.server = relocateServerState(data.server, from, to)
+    }
+    if (typeof data.notification === "string") {
+      data.notification = JSON.stringify(relocateValue(JSON.parse(data.notification), from, to))
+    }
+    if (data.notification && typeof data.notification === "object") {
+      data.notification = relocateValue(data.notification, from, to)
     }
     delete data.layout
     writeFileSync(global, JSON.stringify(data, null, 2) + "\n", "utf8")
@@ -141,8 +147,9 @@ function relocateServerState(value: unknown, from: string, to: string) {
 
 function relocateValue(value: unknown, from: string, to: string): unknown {
   if (typeof value === "string") {
-    if (value.slice(0, 3).toLowerCase() !== from.toLowerCase()) return value
-    return to + value.slice(3)
+    if (value.slice(0, 2).toLowerCase() !== from.toLowerCase()) return value
+    if (value[2] !== "/" && value[2] !== "\\") return value
+    return to + value.slice(2)
   }
   if (Array.isArray(value)) return value.map((item) => relocateValue(item, from, to))
   if (!value || typeof value !== "object") return value
