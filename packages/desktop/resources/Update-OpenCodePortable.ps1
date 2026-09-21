@@ -124,23 +124,27 @@ if ($Package) {
     }
 
     New-Item -ItemType Directory -Force -Path $Work | Out-Null
-    $Verified = $false
-    foreach ($Attempt in 1..3) {
-        if ($Attempt -gt 1) {
-            Write-Host "Download wird erneut versucht ($Attempt/3) ..." -ForegroundColor Yellow
-            Start-Sleep -Seconds 5
-            $Info = Get-PortableRelease
-            $ExpectedMetadata = $Info.Metadata
-            $ExpectedDigest = [string]$Info.Package.digest
-        }
-        $Partial = "$Download.partial"
-        Remove-Item -LiteralPath $Partial -Force -ErrorAction SilentlyContinue
-        Remove-Item -LiteralPath $Download -Force -ErrorAction SilentlyContinue
-        Save-Download $Info.Package.browser_download_url $Partial ([long]$Info.Package.size)
-        Move-Item -LiteralPath $Partial -Destination $Download -Force
-        if (Test-Digest $Download $ExpectedDigest) {
-            $Verified = $true
-            break
+    $Verified = (Test-Path -LiteralPath $Download -PathType Leaf) -and (Test-Digest $Download $ExpectedDigest)
+    if ($Verified) {
+        Write-Host 'Verwende den bereits geprueften Download.'
+    } else {
+        foreach ($Attempt in 1..3) {
+            if ($Attempt -gt 1) {
+                Write-Host "Download wird erneut versucht ($Attempt/3) ..." -ForegroundColor Yellow
+                Start-Sleep -Seconds 5
+                $Info = Get-PortableRelease
+                $ExpectedMetadata = $Info.Metadata
+                $ExpectedDigest = [string]$Info.Package.digest
+            }
+            $Partial = "$Download.partial"
+            Remove-Item -LiteralPath $Partial -Force -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath $Download -Force -ErrorAction SilentlyContinue
+            Save-Download $Info.Package.browser_download_url $Partial ([long]$Info.Package.size)
+            Move-Item -LiteralPath $Partial -Destination $Download -Force
+            if (Test-Digest $Download $ExpectedDigest) {
+                $Verified = $true
+                break
+            }
         }
     }
     if (-not $Verified) {
@@ -149,8 +153,9 @@ if ($Package) {
     }
 }
 
+$DesktopExecutable = Join-Path $Root 'OpenCode.exe'
 $Running = Get-Process -Name 'OpenCode' -ErrorAction SilentlyContinue | Where-Object {
-    try { $_.Path -and $_.Path.StartsWith($Root, [StringComparison]::OrdinalIgnoreCase) } catch { $false }
+    try { $_.Path -and $_.Path.Equals($DesktopExecutable, [StringComparison]::OrdinalIgnoreCase) } catch { $false }
 }
 if ($Running) {
     throw 'OpenCode laeuft noch. Die App vollstaendig beenden und den Updater erneut starten.'
